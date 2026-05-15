@@ -1,31 +1,36 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  S3Client,
-  PutObjectCommand,
-} from '@aws-sdk/client-s3';
+import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { GetObjectCommand } from '@aws-sdk/client-s3';
 
 @Injectable()
-export class StorageService {
+export class StorageService implements OnModuleInit {
   private readonly s3: S3Client;
   private readonly bucket: string;
   private readonly presignTtlSeconds: number;
 
   constructor(private readonly config: ConfigService) {
-    const accountId = this.config.getOrThrow<string>('R2_ACCOUNT_ID');
-    this.bucket = this.config.getOrThrow<string>('R2_BUCKET_NAME');
-    this.presignTtlSeconds = Number(this.config.get('R2_PRESIGN_TTL_SECONDS') ?? 3600);
+    this.bucket = this.config.get<string>('MINIO_BUCKET') ?? 'better-reports';
+    this.presignTtlSeconds = Number(this.config.get('STORAGE_PRESIGN_TTL_SECONDS') ?? 3600);
 
     this.s3 = new S3Client({
-      region: 'auto',
-      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+      region: 'us-east-1',
+      endpoint: this.config.get<string>('MINIO_ENDPOINT') ?? 'http://localhost:9000',
+      forcePathStyle: true,
       credentials: {
-        accessKeyId: this.config.getOrThrow<string>('R2_ACCESS_KEY_ID'),
-        secretAccessKey: this.config.getOrThrow<string>('R2_SECRET_ACCESS_KEY'),
+        accessKeyId: this.config.get<string>('MINIO_ACCESS_KEY') ?? 'minioadmin',
+        secretAccessKey: this.config.get<string>('MINIO_SECRET_KEY') ?? 'minioadmin',
       },
     });
+  }
+
+  async onModuleInit() {
+    const { CreateBucketCommand, HeadBucketCommand } = await import('@aws-sdk/client-s3');
+    try {
+      await this.s3.send(new HeadBucketCommand({ Bucket: this.bucket }));
+    } catch {
+      await this.s3.send(new CreateBucketCommand({ Bucket: this.bucket }));
+    }
   }
 
   async upload(key: string, buffer: Buffer, contentType = 'application/pdf'): Promise<void> {
