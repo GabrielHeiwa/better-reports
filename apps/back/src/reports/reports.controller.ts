@@ -1,6 +1,5 @@
 import { InjectQueue } from '@nestjs/bullmq';
-import { Body, Controller, Get, Param, Post, Res, UseGuards } from '@nestjs/common';
-import { ThrottlerGuard } from '@nestjs/throttler';
+import { Body, Controller, Get, Param, Post, Res } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import type { Response } from 'express';
 import { randomUUID } from 'node:crypto';
@@ -8,7 +7,6 @@ import { GenerateReportDto } from './generate-report.dto';
 import { PDF_QUEUE, PdfJobData } from './pdf.processor';
 
 @Controller('reports')
-@UseGuards(ThrottlerGuard)
 export class ReportsController {
   constructor(@InjectQueue(PDF_QUEUE) private readonly pdfQueue: Queue) {}
 

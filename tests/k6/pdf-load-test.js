@@ -82,6 +82,7 @@ export default function () {
 
   if (!enqueueOk) {
     jobErrorRate.add(1);
+    sleep(1);
     return;
   }
 
