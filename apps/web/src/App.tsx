@@ -45,9 +45,11 @@ export default function App() {
   const { template, setTemplate, undo, redo, canUndo, canRedo } = useTemplateHistory(savedTemplate)
   const { result, error, needsManual, process } = useHandlebars(template, jsonStr)
   const [pdfLoading, setPdfLoading] = useState(false)
+  const [pdfStatus, setPdfStatus] = useState<string | null>(null)
 
   async function handleGeneratePdf() {
     setPdfLoading(true)
+    setPdfStatus('Enfileirando...')
     try {
       const res = await fetch('http://localhost:3000/reports/generate', {
         method: 'POST',
@@ -55,17 +57,39 @@ export default function App() {
         body: JSON.stringify({ template, parameters: JSON.parse(jsonStr || '{}'), options: pdfConfig }),
       })
       if (!res.ok) throw new Error(`Erro ${res.status}: ${await res.text()}`)
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${pdfConfig.filename || 'report'}.pdf`
-      a.click()
-      URL.revokeObjectURL(url)
+      const { jobId } = await res.json()
+
+      await new Promise<void>((resolve, reject) => {
+        const es = new EventSource(`http://localhost:3000/reports/job/${jobId}/events`)
+
+        es.addEventListener('status', (e) => {
+          const data = JSON.parse(e.data) as { state: string }
+          setPdfStatus(data.state === 'active' ? 'Gerando PDF...' : 'Aguardando...')
+        })
+
+        es.addEventListener('done', (e) => {
+          es.close()
+          const { presignedUrl } = JSON.parse(e.data) as { presignedUrl: string }
+          const a = document.createElement('a')
+          a.href = presignedUrl
+          a.download = `${pdfConfig.filename || 'report'}.pdf`
+          a.click()
+          resolve()
+        })
+
+        es.addEventListener('error', (e) => {
+          es.close()
+          const msg = e instanceof MessageEvent
+            ? (JSON.parse(e.data) as { message: string }).message
+            : 'Falha na geração'
+          reject(new Error(msg))
+        })
+      })
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Erro ao gerar PDF')
     } finally {
       setPdfLoading(false)
+      setPdfStatus(null)
     }
   }
 
@@ -89,7 +113,7 @@ export default function App() {
             </Button>
           )}
           <Button size="sm" onClick={handleGeneratePdf} disabled={pdfLoading}>
-            {pdfLoading ? 'Gerando...' : 'Gerar PDF'}
+            {pdfLoading ? (pdfStatus ?? 'Aguardando...') : 'Gerar PDF'}
           </Button>
         </div>
       </header>
