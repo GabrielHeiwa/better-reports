@@ -1,11 +1,13 @@
 import { InjectQueue } from '@nestjs/bullmq';
-import { Body, Controller, Get, Param, Post, Res } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Res, UseGuards } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import type { Response } from 'express';
 import { randomUUID } from 'node:crypto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GenerateReportDto } from './generate-report.dto';
 import { PDF_QUEUE, PdfJobData } from './pdf.processor';
 
+@UseGuards(JwtAuthGuard)
 @Controller('reports')
 export class ReportsController {
   constructor(@InjectQueue(PDF_QUEUE) private readonly pdfQueue: Queue) {}

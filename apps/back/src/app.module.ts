@@ -4,7 +4,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AuthModule } from './auth/auth.module';
 import { LlmModule } from './llm/llm.module';
+import { PrismaModule } from './prisma/prisma.module';
 import { ReportsModule } from './reports/reports.module';
 
 @Module({
@@ -25,6 +27,8 @@ import { ReportsModule } from './reports/reports.module';
       }),
     }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 10 }]),
+    PrismaModule,
+    AuthModule,
     ReportsModule,
     LlmModule,
   ],

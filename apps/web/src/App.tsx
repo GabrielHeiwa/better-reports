@@ -4,6 +4,8 @@ import { CodeEditor } from '@/components/CodeEditor'
 import { Preview } from '@/components/Preview'
 import { Chat } from '@/components/Chat'
 import { PdfConfigForm } from '@/components/PdfConfigForm'
+import { useAuth } from '@/contexts/AuthContext'
+import { LoginPage } from '@/pages/LoginPage'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useHandlebars } from '@/hooks/useHandlebars'
 import { useTemplateHistory } from '@/hooks/useTemplateHistory'
@@ -39,6 +41,8 @@ const DEFAULT_JSON = `{
 }`
 
 export default function App() {
+  const { user, loading, logout } = useAuth()
+
   const [savedTemplate] = useLocalStorage('br-template', DEFAULT_TEMPLATE)
   const [jsonStr, setJsonStr] = useLocalStorage('br-json', DEFAULT_JSON)
   const [pdfConfig, setPdfConfig] = useLocalStorage<PdfConfig>('br-pdf-config', DEFAULT_PDF_CONFIG)
@@ -47,12 +51,23 @@ export default function App() {
   const [pdfLoading, setPdfLoading] = useState(false)
   const [pdfStatus, setPdfStatus] = useState<string | null>(null)
 
+  if (loading) {
+    return (
+      <div className="dark h-screen w-screen flex items-center justify-center bg-background text-muted-foreground text-sm">
+        Carregando...
+      </div>
+    )
+  }
+
+  if (!user) return <LoginPage />
+
   async function handleGeneratePdf() {
     setPdfLoading(true)
     setPdfStatus('Enfileirando...')
     try {
       const res = await fetch('http://localhost:3000/reports/generate', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ template, parameters: JSON.parse(jsonStr || '{}'), options: pdfConfig }),
       })
@@ -60,7 +75,9 @@ export default function App() {
       const { jobId } = await res.json()
 
       await new Promise<void>((resolve, reject) => {
-        const es = new EventSource(`http://localhost:3000/reports/job/${jobId}/events`)
+        const es = new EventSource(`http://localhost:3000/reports/job/${jobId}/events`, {
+          withCredentials: true,
+        })
 
         es.addEventListener('status', (e) => {
           const data = JSON.parse(e.data) as { state: string }
@@ -115,12 +132,20 @@ export default function App() {
           <Button size="sm" onClick={handleGeneratePdf} disabled={pdfLoading}>
             {pdfLoading ? (pdfStatus ?? 'Aguardando...') : 'Gerar PDF'}
           </Button>
+          <div className="flex items-center gap-2 ml-2 pl-2 border-l border-border">
+            {user.picture && (
+              <img src={user.picture} alt={user.name} className="w-6 h-6 rounded-full" />
+            )}
+            <span className="text-xs text-muted-foreground">{user.name}</span>
+            <Button size="sm" variant="ghost" onClick={logout} className="text-xs">
+              Sair
+            </Button>
+          </div>
         </div>
       </header>
 
       <div className="flex-1 overflow-hidden">
         <PanelGroup orientation="horizontal" className="h-full">
-          {/* Col esquerda 60%: HTML editor + JSON */}
           <Panel defaultSize={60} minSize={30}>
             <PanelGroup orientation="vertical" className="h-full">
               <Panel defaultSize={60} minSize={20}>
@@ -159,7 +184,6 @@ export default function App() {
 
           <PanelResizeHandle className="w-1 bg-border hover:bg-primary/50 transition-colors cursor-col-resize" />
 
-          {/* Col direita 40%: Preview full height */}
           <Panel defaultSize={40} minSize={20}>
             <div className="h-full flex flex-col">
               <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground border-b border-border bg-muted/30 shrink-0">

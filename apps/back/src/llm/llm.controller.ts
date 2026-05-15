@@ -1,11 +1,12 @@
 import { Body, Controller, Post, Res, UseGuards } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import type { Response } from 'express';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ChatDto } from './chat-message.dto';
 import { LlmService } from './llm.service';
 
+@UseGuards(JwtAuthGuard, ThrottlerGuard)
 @Controller('llm')
-@UseGuards(ThrottlerGuard)
 export class LlmController {
   constructor(private readonly llmService: LlmService) {}
 

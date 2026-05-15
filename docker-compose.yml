@@ -31,6 +31,24 @@ services:
       timeout: 3s
       retries: 5
 
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: betterreports
+      POSTGRES_PASSWORD: betterreports
+      POSTGRES_DB: betterreports
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U betterreports']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
 volumes:
   redis_data:
   minio_data:
+  postgres_data:
